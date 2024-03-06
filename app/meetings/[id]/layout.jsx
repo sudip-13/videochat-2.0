@@ -14,19 +14,23 @@ export default function Layout({ children }) {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [stream, setStream] = useState(null);
   const [audiostream, setAudioStream] = useState(null);
+  const [screenShareStream,setScreenShareStream] = useState(null);
+
 
   const [remoteStream, setRemoteStream] = useState(null);
   const [remoteAudioStream, setRemoteAudioStream] = useState(null);
 
   const videoRef = useRef(null);
   const audioRef = useRef(null);
+  const screenShareRef = useRef(null);
+
 
   const { socket } = useSocket();
 
   const toggleChatPopup = () => {
     setShowChatPopup(!showChatPopup);
   };
-  const toggleRecording =useCallback(async() => {
+  const toggleRecording = useCallback(async () => {
     setIsRecording((prevState) => !prevState);
     if (!isRecording) {
       try {
@@ -44,11 +48,11 @@ export default function Layout({ children }) {
           });
         }
       }
-        catch (error) {
-          console.error("Error accessing video devices:", error);
-        }
+      catch (error) {
+        console.error("Error accessing video devices:", error);
       }
-  },[isRecording,setAudioStream]);
+    }
+  }, [isRecording, setAudioStream]);
   const toggleInfoPopup = () => {
     setShowInfoPopup(!showInfoPopup);
   };
@@ -102,6 +106,31 @@ export default function Layout({ children }) {
 
   const toggleScreenShare = async () => {
     setIsScreenSharing((prevState) => !prevState);
+    if (!isScreenSharing) {
+      try {
+        const mediaStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+        });
+        setScreenShareStream(mediaStream);
+        if (screenShareRef.current) {
+          screenShareRef.current.srcObject = mediaStream;
+        }
+        if (peer.peer && mediaStream) {
+          mediaStream.getTracks().forEach((track) => {
+            peer.peer.addTrack(track, mediaStream);
+            console.log("Added screen share track to peer connection", mediaStream);
+          });
+        }
+
+      } catch (error) {
+        console.error("Error accessing screen sharing:", error);
+      }
+    } else {
+      if (screenShareStream) {
+        screenShareStream.getTracks().forEach(track => track.stop());
+        setScreenShareStream(null);
+      }
+    }
   };
 
   const handleEventListenTracks = useCallback(
@@ -125,7 +154,7 @@ export default function Layout({ children }) {
 
     return () => {
       peer.peer.removeEventListener("track", handleEventListenTracks);
-  
+
 
     };
   }, [peer, handleEventListenTracks]);
@@ -145,15 +174,15 @@ export default function Layout({ children }) {
           {remoteStream ? (
             <div>
               <h1>Remote Stream</h1>
-              <ReactPlayer playing  height="175px" url={remoteStream} />
+              <ReactPlayer playing height="175px" url={remoteStream} />
             </div>
           ) : null}
         </div>
 
-        {/* {isRecording ? (
-              <ReactPlayer playing  url={audiostream} />
-          ) : null} */}
-   
+        {isScreenSharing ? (
+              <ReactPlayer playing height="575px" url={screenShareStream} />
+          ) : null}
+
         <div className="ml-5 mr-5 mt-5 max-w-lg flex flex-wrap">
           {isVideoEnabled ? (
             <div className="bg-white mb-5 border border-gray-200 h-44 w-52 mr-3 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700">
